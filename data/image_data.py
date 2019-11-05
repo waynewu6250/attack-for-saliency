@@ -8,7 +8,7 @@ import pickle
 
 class ImageSet(Dataset):
 
-    def __init__(self, img_path, label_path, dic_path, load=True):
+    def __init__(self, imgs, labels, dic_path, load=True):
         
         super(ImageSet, self).__init__()
         
@@ -19,9 +19,9 @@ class ImageSet(Dataset):
             tv.transforms.Normalize([0.485, 0.456, 0.406],
                                     [0.229, 0.224, 0.225])
         ])
-        self.imgs = self.load_pickle(img_path)
+        self.imgs = imgs
         self.num_data = len(self.imgs)
-        self.labels = self.load_pickle(label_path)
+        self.labels = labels
 
         if load:
             self.label2id = self.load_pickle(dic_path)
@@ -49,7 +49,7 @@ class ImageSet(Dataset):
         path = os.path.join(self.imgs[index])
         img = Image.open(path).convert('RGB')
         img = self.transform(img)
-        label = self.label2id[self.labels[self.imgs[index]]]
+        label = self.label2id[self.labels[index]]
         return img, index, label
     
     def __len__(self):
