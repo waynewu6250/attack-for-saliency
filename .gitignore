@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+eyenet_data_0420_2019_60_20_20/
+checkpoints/

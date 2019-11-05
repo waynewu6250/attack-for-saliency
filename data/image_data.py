@@ -8,7 +8,7 @@ import pickle
 
 class ImageSet(Dataset):
 
-    def __init__(self, img_path, label_path):
+    def __init__(self, img_path, label_path, dic_path, load=True):
         
         super(ImageSet, self).__init__()
         
@@ -20,18 +20,33 @@ class ImageSet(Dataset):
                                     [0.229, 0.224, 0.225])
         ])
         self.imgs = self.load_pickle(img_path)
+        self.num_data = len(self.imgs)
         self.labels = self.load_pickle(label_path)
-        self.label2id = {}
-        counter = 0
-        for label in self.labels.values():
-            if label not in self.label2id:
-                self.label2id[label] = counter
-                counter += 1
+
+        if load:
+            self.label2id = self.load_pickle(dic_path)
+        else:
+            # if val:
+            #     self.label2id = self.load_pickle(dic_path)
+            #     counter = len(self.label2id)
+            # else:
+            self.label2id = {}
+            counter = 0
+            
+            for label in self.labels.values():
+                if label not in self.label2id:
+                    self.label2id[label] = counter
+                    counter += 1
+            
+            self.save_pickle(self.label2id, dic_path)
+        
         self.num_labels = len(self.label2id)
+
+
     
     def __getitem__(self, index):
-        root = '/Users/waynewu/10.backup_code/new_eyenet'
-        path = os.path.join(root, self.imgs[index])
+        # root = '/Users/waynewu/10.backup_code/new_eyenet'
+        path = os.path.join(self.imgs[index])
         img = Image.open(path).convert('RGB')
         img = self.transform(img)
         label = self.label2id[self.labels[self.imgs[index]]]
@@ -45,16 +60,17 @@ class ImageSet(Dataset):
     def load_pickle(file):
         with open(file,'rb') as f:
             return pickle.load(f)
+    
+    # save pickle files
+    @staticmethod
+    def save_pickle(array, file):
+        with open(file,'wb') as f:
+            return pickle.dump(array, f)
 
 if __name__ == "__main__":
 
-    data = ImageSet("./train_images.pkl", "./train_labels.pkl")
+    data = ImageSet("./train_images.pkl", "./train_labels.pkl", "./label2id.pkl", load=False)
     dataloader = DataLoader(data, batch_size=64, shuffle=False)
-    for img, index, label in dataloader:
-        print(img[0][0])
-        print(index[0])
-        print(label[0])
-        break
 
     
     
