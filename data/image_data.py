@@ -45,8 +45,8 @@ class ImageSet(Dataset):
 
     
     def __getitem__(self, index):
-        # root = '/Users/waynewu/10.backup_code/new_eyenet'
-        path = os.path.join(self.imgs[index])
+        root = '/Users/waynewu/10.backup_code/new_eyenet'
+        path = os.path.join(root, self.imgs[index])
         img = Image.open(path).convert('RGB')
         img = self.transform(img)
         label = self.label2id[self.labels[index]]

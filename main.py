@@ -12,11 +12,13 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 from PIL import Image
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 from data import ImageSet
 from config import opt
 from models import UntargetedAttack
+from models import Generator
 
 def load_pickle(file):
     with open(file,'rb') as f:
@@ -118,7 +120,8 @@ def test(**kwargs):
                                     [0.229, 0.224, 0.225])
         ])
 
-    img = Image.open(imgs[index]).convert('RGB')
+    # img = Image.open(imgs[index]).convert('RGB')
+    img = Image.open("untargeted_adv_img.jpg").convert('RGB')
     img = transform(img)
 
     #Model
@@ -133,7 +136,8 @@ def test(**kwargs):
     img = Variable(img).to(device)
     outputs = model(img.unsqueeze(0))
     
-    print("predicted label: ", id2label[t.max(outputs,1)[1].item()])
+    # print("predicted label: ", id2label[t.max(outputs,1)[1].item()])
+    print("predicted label: ", t.max(outputs,1)[1].item())
     print("Real label: ", labels[index])
 
     
@@ -166,12 +170,18 @@ def perform_attack(**kwargs):
 
     # Select attack model
     if opt.attack_model == "fast_attack":
-        attackmodel = UntargetedAttack(model, opt.alpha, imgs[index], label2id[labels[index]], device)
+        attackmodel = UntargetedAttack(model, opt.alpha, '/nethome/twu367/attack-for-saliency/'+imgs[index], label2id[labels[index]], device)
+    netg = Generator(opt.inf, opt.gnf)
+    if opt.netg_path:
+        netg.load_state_dict(t.load(opt.netg_path, map_location='cpu'))
+    netg.to(device)
     
-    attackmodel.generate()
+    attackmodel.generate(netg, opt)
 
             
 
 if __name__ == "__main__":
-    import fire
-    fire.Fire()
+    # import fire
+    # fire.Fire()
+    perform_attack()
+    test()

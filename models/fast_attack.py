@@ -4,10 +4,13 @@ import numpy as np
 import torch as t
 from torch import nn
 from torch.autograd import Variable
+from torch.optim import Adam
 import torch.nn.functional as F
 import torchvision as tv
+from torchvision.utils import save_image
 from PIL import Image
 import cv2
+import copy
 
 class UntargetedAttack():
 
@@ -16,6 +19,7 @@ class UntargetedAttack():
         self.model = model
         self.model.eval()
         self.alpha = alpha
+        self.device = device
 
         # image
         self.transform = tv.transforms.Compose([
@@ -28,9 +32,8 @@ class UntargetedAttack():
 
         img = Image.open(image_path).convert('RGB')
         self.img = self.transform(img)
-        self.img = Variable(self.img).to(device)
+        self.img.unsqueeze_(0)
 
-        self.img_original = img
         self.true_label = true_label
         self.true_label_var = Variable(t.LongTensor([true_label])).to(device)
 
@@ -46,7 +49,7 @@ class UntargetedAttack():
 
         reverse_mean = [-0.485, -0.456, -0.406]
         reverse_std = [1/0.229, 1/0.224, 1/0.225]
-        recreated_im = copy.copy(im_as_var.data.numpy()[0])
+        recreated_im = copy.copy(im_as_var.cpu().data.numpy()[0])
         for c in range(3):
             recreated_im[c] /= reverse_std[c]
             recreated_im[c] -= reverse_mean[c]
@@ -59,49 +62,62 @@ class UntargetedAttack():
         # Convert RBG to GBR
         recreated_im = recreated_im[..., ::-1]
         return recreated_im
-    
-    def create_noise(self, img):
-
-        adv_noise = self.alpha * t.sign(img.grad.data)
-        img.data = img.data + adv_noise
-
-        return img
 
     
-    def generate(self):
+    def generate(self, netg, opt):
         
-        criterion = t.nn.CrossEntropyLoss()
+        adv_noise = t.randn(1, opt.inf, 1, 1).to(self.device)
+        optimizer_g = Adam(netg.parameters(), opt.lr1, betas=(opt.beta1, 0.999))
+        criterion = t.nn.CrossEntropyLoss().to(self.device)
 
-        for _ in range(10):
+        for i in range(10):
 
-            self.img.grad = None
+            print("\n======== Iteration {} ========".format(i))
+            print('Original image was classified as: ', self.true_label_var.item())
+
+            optimizer_g.zero_grad()
+            img_original = Variable(self.img).to(self.device)
+            img_as_var = Variable(self.img).to(self.device).detach()
 
             # First pass the original image into model
-            output = self.model(self.img.unsqueeze(0))
+            output = self.model(img_original)
             pred_loss = criterion(output, self.true_label_var)
-            pred_loss.backward()
-
+            print("Original loss: ", pred_loss.item())
+            prediction_true = t.max(output,1)[1].item()
+            
             # Create noise
-            img_with_noise = self.create_noise(self.img)
-            img_reconstruct = self.recreate_image(img_with_noise)
-            self.img = self.transform(img_reconstruct)
+            # adv_noise.copy_(t.randn(1, opt.inf, 1, 1))
+            fake_img = netg(adv_noise)
+            
+            #adv_noise = self.alpha * t.sign(img.grad.data)
+            img_with_noise = img_as_var + self.alpha*fake_img
+            #img_reconstruct = self.recreate_image(img_with_noise)
+            #self.img_as_var = self.transform(t.Tensor(img_reconstruct).to(self.device))
 
             # Re pass the processes image into model
-            output = self.model(self.img.unsqueeze(0))
-            prediction = t.max(outputs,1)[1].item()
-            confirmation_score = F.softmax(output)[prediction]
+            output_reconstruct = self.model(img_with_noise)
+            pred_loss_reconstruct = -criterion(output_reconstruct, self.true_label_var)
+            print("Later loss: ", pred_loss_reconstruct.item())
+
+            pred_loss_reconstruct.backward(retain_graph=True)
+            optimizer_g.step()
+
+            prediction = t.max(output_reconstruct,1)[1].item()
+            confirmation_score = F.softmax(output_reconstruct[0], dim=0)[prediction]
+            
 
             if prediction != self.true_label:
-                print('Original image was predicted as: ', self.true_label)
+                print('\nAttack Success!!')
+                print('Original image was predicted as: ', prediction_true)
                 print('With adversarial noise converted to: ', prediction)
-                print('The confident score by probability is: ', confirmation_score)
+                print('The confident score by probability is: ', confirmation_score.item())
 
-                noise_image = self.img_original - self.img
-                cv2.imwrite('../generated/untargeted_adv_noise_from_' + str(self.true_label) + '_to_' +
-                            str(prediction) + '.jpg', noise_image)
-                
-                cv2.imwrite('../generated/untargeted_adv_img_from_' + str(self.true_label) + '_to_' +
-                            str(prediction) + '.jpg', self.img)
+                save_image(img_original, 'untargeted_original.jpg')
+                save_image(self.alpha*fake_img, 'untargeted_adv_noise.jpg')
+                save_image(img_as_var, 'untargeted_adv_img.jpg')
+                if confirmation_score.item() > 0.9:
+                    break
+
         return 1
 
 
