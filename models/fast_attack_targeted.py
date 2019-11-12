@@ -12,9 +12,9 @@ from PIL import Image
 import cv2
 import copy
 
-class UntargetedAttack():
+class TargetedAttack():
 
-    def __init__(self, model, alpha, image_path, true_label, device):
+    def __init__(self, model, alpha, image_path, true_label, device, target_label):
         
         self.model = model
         self.alpha = alpha
@@ -36,6 +36,9 @@ class UntargetedAttack():
 
         self.true_label = true_label
         self.true_label_var = Variable(t.LongTensor([true_label])).to(device)
+
+        self.target_label = target_label
+        self.target_label_var = Variable(t.LongTensor([target_label])).to(device)
 
     
     def recreate_image(self, im_as_var):
@@ -75,7 +78,7 @@ class UntargetedAttack():
         img_original = Variable(self.img).to(self.device)
         img_as_var = Variable(self.img).to(self.device)
 
-        for i in range(10):
+        for i in range(100):
 
             print("\n======== Iteration {} ========".format(i))
             print('Original image was classified as: ', self.true_label_var.item())
@@ -100,7 +103,7 @@ class UntargetedAttack():
 
             # Re pass the processes image into model
             output_reconstruct = self.model(img_with_noise)
-            pred_loss_reconstruct = -criterion(output_reconstruct, self.true_label_var)
+            pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var)
             print("Later loss: ", pred_loss_reconstruct.item())
 
             pred_loss_reconstruct.backward(retain_graph=True)
@@ -110,18 +113,18 @@ class UntargetedAttack():
             confirmation_score = F.softmax(output_reconstruct[0], dim=0)[prediction]
             
 
-            if prediction != self.true_label:
+            if prediction == self.target_label:
                 print('\nAttack Success!!')
                 print('Original image was predicted as: ', prediction_true)
                 print('With adversarial noise converted to: ', prediction)
                 print('The confident score by probability is: ', confirmation_score.item())
 
                 im = Image.fromarray(self.recreate_image(img_original))
-                im.save('untargeted_original.jpg')
+                im.save('targeted_original.jpg')
                 im = Image.fromarray(self.recreate_image(fake_img))
-                im.save('untargeted_adv_noise.jpg')
+                im.save('targeted_adv_noise.jpg')
                 im = Image.fromarray(self.recreate_image(img_with_noise))
-                im.save('untargeted_adv_img.jpg')
+                im.save('targeted_adv_img.jpg')
 
                 # save_image(img_original, 'untargeted_original.jpg')
                 # save_image(self.alpha*fake_img, 'untargeted_adv_noise.jpg')

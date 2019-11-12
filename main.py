@@ -17,7 +17,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 from data import ImageSet
 from config import opt
-from models import UntargetedAttack
+from models import UntargetedAttack, TargetedAttack
 from models import Generator
 
 def load_pickle(file):
@@ -120,8 +120,7 @@ def test(**kwargs):
                                     [0.229, 0.224, 0.225])
         ])
 
-    # img = Image.open(imgs[index]).convert('RGB')
-    img = Image.open("untargeted_adv_img.jpg").convert('RGB')
+    img = Image.open(imgs[index]).convert('RGB')
     img = transform(img)
 
     #Model
@@ -136,9 +135,25 @@ def test(**kwargs):
     img = Variable(img).to(device)
     outputs = model(img.unsqueeze(0))
     
-    # print("predicted label: ", id2label[t.max(outputs,1)[1].item()])
-    print("predicted label: ", t.max(outputs,1)[1].item())
+    print()
+    print("predicted label: ", id2label[t.max(outputs,1)[1].item()])
     print("Real label: ", labels[index])
+
+    ########## for testing ##########
+    # print("Testing Phase")
+    # img_before = Image.open("untargeted_original.jpg").convert('RGB')
+    # img_after = Image.open("untargeted_adv_img.jpg").convert('RGB')
+    # img_before = transform(img_before)
+    # img_after = transform(img_after)
+
+    # img_before = Variable(img_before).to(device)
+    # img_after= Variable(img_after).to(device)
+    # outputs_before = model(img_before.unsqueeze(0))
+    # outputs_after = model(img_after.unsqueeze(0))
+    # print("Label before attack: ", t.max(outputs_before,1)[1].item())
+    # print("Label after attack: ", t.max(outputs_after,1)[1].item())
+
+
 
     
     #############################################
@@ -169,8 +184,11 @@ def perform_attack(**kwargs):
     model.to(device)
 
     # Select attack model
-    if opt.attack_model == "fast_attack":
-        attackmodel = UntargetedAttack(model, opt.alpha, '/nethome/twu367/attack-for-saliency/'+imgs[index], label2id[labels[index]], device)
+    path = '/nethome/twu367/attack-for-saliency/'+imgs[index]
+    if opt.attack_model == "untargeted-attack":
+        attackmodel = UntargetedAttack(model, opt.alpha, path, label2id[labels[index]], device)
+    elif opt.attack_model == "targeted-attack":
+        attackmodel = TargetedAttack(model, opt.alpha, path, label2id[labels[index]], device, 100)
     netg = Generator(opt.inf, opt.gnf)
     if opt.netg_path:
         netg.load_state_dict(t.load(opt.netg_path, map_location='cpu'))
@@ -184,4 +202,4 @@ if __name__ == "__main__":
     # import fire
     # fire.Fire()
     perform_attack()
-    test()
+    #test()
