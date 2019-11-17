@@ -12,11 +12,12 @@ from PIL import Image
 import cv2
 import copy
 
-class TargetedAttack():
+class MaskTargetedAttack():
 
-    def __init__(self, model, alpha, image_path, true_label, device, target_label):
+    def __init__(self, model, mask_model, alpha, image_path, true_label, device, target_label):
         
         self.model = model
+        self.mask_model = mask_model.to(device)
         self.alpha = alpha
         self.device = device
 
@@ -78,7 +79,7 @@ class TargetedAttack():
         img_original = Variable(self.img).to(self.device)
         img_as_var = Variable(self.img).to(self.device)
 
-        for i in range(100):
+        for i in range(200):
 
             print("\n======== Iteration {} ========".format(i))
             print('Original image was classified as: ', self.true_label_var.item())
@@ -94,10 +95,14 @@ class TargetedAttack():
             
             # Create noise
             # adv_noise.copy_(t.randn(1, opt.inf, 1, 1))
+            noise_interpolated = F.interpolate(img_original, size=[572, 572], mode="bilinear")
+            noise_interpolated = self.mask_model(noise_interpolated)
+            
+            noise_interpolated = F.interpolate(noise_interpolated, size=[224, 224], mode="bilinear")
             fake_img = netg(adv_noise)
             
             #adv_noise = self.alpha * t.sign(img.grad.data)
-            img_with_noise = img_as_var + self.alpha*fake_img
+            img_with_noise = img_as_var + self.alpha*fake_img*noise_interpolated
             #img_reconstruct = self.recreate_image(img_with_noise)
             #self.img_as_var = self.transform(t.Tensor(img_reconstruct).to(self.device))
 
@@ -120,11 +125,11 @@ class TargetedAttack():
                 print('The confident score by probability is: ', confirmation_score.item())
 
                 im = Image.fromarray(self.recreate_image(img_original))
-                im.save('targeted_original.jpg')
-                im = Image.fromarray(self.recreate_image(fake_img))
-                im.save('targeted_adv_noise.jpg')
+                im.save('mask_targeted_original.jpg')
+                im = Image.fromarray(self.recreate_image(fake_img*noise_interpolated))
+                im.save('mask_targeted_adv_noise.jpg')
                 im = Image.fromarray(self.recreate_image(img_with_noise))
-                im.save('targeted_adv_img.jpg')
+                im.save('mask_targeted_adv_img.jpg')
 
                 # save_image(img_original, 'untargeted_original.jpg')
                 # save_image(self.alpha*fake_img, 'untargeted_adv_noise.jpg')
@@ -134,13 +139,3 @@ class TargetedAttack():
                     break
 
         return 1
-
-
-
-
-
-
-
-
-
-

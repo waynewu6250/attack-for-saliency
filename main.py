@@ -17,8 +17,8 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 from data import ImageSet
 from config import opt
-from models import UntargetedAttack, TargetedAttack
-from models import Generator
+from models import UntargetedAttack, TargetedAttack, MaskTargetedAttack
+from models import Generator, SimpleUnet
 
 def load_pickle(file):
     with open(file,'rb') as f:
@@ -188,7 +188,13 @@ def perform_attack(**kwargs):
     if opt.attack_model == "untargeted-attack":
         attackmodel = UntargetedAttack(model, opt.alpha, path, label2id[labels[index]], device)
     elif opt.attack_model == "targeted-attack":
-        attackmodel = TargetedAttack(model, opt.alpha, path, label2id[labels[index]], device, 100)
+        target_label = 10
+        attackmodel = TargetedAttack(model, opt.alpha, path, label2id[labels[index]], device, target_label)
+    elif opt.attack_model == "mask-targeted-attack":
+        target_label = 10
+        mask_model = SimpleUnet()
+        attackmodel = MaskTargetedAttack(model, mask_model, opt.alpha, path, label2id[labels[index]], device, target_label)
+    
     netg = Generator(opt.inf, opt.gnf)
     if opt.netg_path:
         netg.load_state_dict(t.load(opt.netg_path, map_location='cpu'))

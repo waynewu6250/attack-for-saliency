@@ -111,7 +111,7 @@ class SimpleUnet(nn.Module):
         )
 
         # Final output
-        self.conv_final = nn.Conv2d(in_channels=32, out_channels=2,
+        self.conv_final = nn.Conv2d(in_channels=32, out_channels=1,
                                     kernel_size=1, padding=0, stride=1)
 
     def forward(self, x):
@@ -176,6 +176,7 @@ class SimpleUnet(nn.Module):
 
         # Final output
         x = self.conv_final(x)
+        x = nn.Sigmoid()(x)
         return x
 
 
@@ -184,4 +185,4 @@ if __name__ == "__main__":
     im = torch.randn(1, 3, 572, 572)
     model = SimpleUnet()
     x = model(im)
-    print(x)
+    print(x.shape)

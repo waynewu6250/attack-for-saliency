@@ -10,7 +10,7 @@ class Config:
     model_path = path+"checkpoints/model-4.pth"
     save_model = 1
 
-    attack_model = "targeted-attack"
+    attack_model = "mask-targeted-attack"
     netg_path = None
     lr1 = 2e-4
     beta1 = 0.5

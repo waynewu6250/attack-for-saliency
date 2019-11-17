@@ -62,7 +62,7 @@ class UntargetedAttack():
         recreated_im = np.uint8(recreated_im).transpose(1, 2, 0)
         
         # Convert RBG to GBR
-        recreated_im = recreated_im[..., ::-1]
+        #recreated_im = recreated_im[..., ::-1]
         return recreated_im
 
     
