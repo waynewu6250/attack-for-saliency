@@ -97,10 +97,10 @@ def train(**kwargs):
 
     #############################################
 
-def test(**kwargs):
+def test(i):
 
-    for k, v in kwargs.items():
-        setattr(opt, k, v)
+    # for k, v in kwargs.items():
+    #     setattr(opt, k, v)
 
     device = t.device('cuda') if t.cuda.is_available() else t.device('cpu')
 
@@ -121,6 +121,7 @@ def test(**kwargs):
         ])
 
     img = Image.open(imgs[index]).convert('RGB')
+    img.save("/nethome/twu367/attack-for-saliency/generated/original/original_classified_img_{}.jpg".format(i))
     img = transform(img)
 
     #Model
@@ -132,8 +133,57 @@ def test(**kwargs):
     model.eval()
     model.to(device)
     
-    img = Variable(img).to(device)
-    outputs = model(img.unsqueeze(0))
+    # Compute Grads: saliency map
+    def get_mask(img):
+        
+        img = Variable(img).requires_grad_(True).to(device)
+        outputs = model(img.unsqueeze(0))
+        y = outputs[0][t.max(outputs,1)[1].item()]
+        dydx = t.autograd.grad(outputs=y,
+                            inputs=img,
+                            grad_outputs=t.ones(y.size()).to(device),
+                            retain_graph=True,
+                            create_graph=True,
+                            only_inputs=True)
+        return dydx, outputs
+    
+    def convert_gray(dydx):
+        image_2d = np.sum(np.abs(dydx[0].cpu().detach().numpy()), axis=0)
+        vmax = np.percentile(image_2d, 99)
+        vmin = np.min(image_2d)
+        return np.clip((image_2d - vmin) / (vmax - vmin), 0, 1)
+    
+    def get_smooth_mask(img, stdev_spread = .15, nsamples = 25, magnitude = True):
+        
+        stdev = stdev_spread * (t.max(img) - t.min(img))
+
+        total_gradients = t.zeros(img.shape).to(device)
+        for _ in range(nsamples):
+            noise = t.FloatTensor(np.random.normal(0, stdev, img.shape))
+            x_plus_noise = img + noise
+            grad, _ = get_mask(x_plus_noise)
+            
+            if magnitude:
+                total_gradients += (grad[0] * grad[0])
+            else:
+                total_gradients += grad[0]
+
+        return total_gradients / nsamples
+
+    
+    # Rough grad
+    dydx, outputs = get_mask(img)
+    image_2d = convert_gray(dydx)
+    from matplotlib import pylab as P
+    P.imsave("/nethome/twu367/attack-for-saliency/generated/original/gradient_{}.png".format(i), image_2d, cmap=P.cm.gray, vmin=0, vmax=1)
+
+    # smooth grad
+    print(img.shape)
+    dydx = get_smooth_mask(img)
+    image_2d = convert_gray(dydx.unsqueeze(0))
+    P.imsave("/nethome/twu367/attack-for-saliency/generated/original/smooth_gradient_{}.png".format(i), image_2d, cmap=P.cm.gray, vmin=0, vmax=1)
+    
+
     
     print()
     print("predicted label: ", id2label[t.max(outputs,1)[1].item()])
@@ -172,7 +222,8 @@ def perform_attack(**kwargs):
     id2label = {v:k for k, v in label2id.items()}
 
     labels = [labels[img] for img in imgs]
-    index = np.random.randint(0,len(imgs), 1)[0]
+    index = 3510 #np.random.randint(0,len(imgs), 1)[0]
+    
 
     #Model
     model = tv.models.resnet50(pretrained=True)
@@ -200,12 +251,16 @@ def perform_attack(**kwargs):
         netg.load_state_dict(t.load(opt.netg_path, map_location='cpu'))
     netg.to(device)
     
-    attackmodel.generate(netg, opt)
+    return attackmodel.generate(netg, opt)
 
             
 
 if __name__ == "__main__":
     # import fire
     # fire.Fire()
+
+    # for i in range(3):
+    #     test(i)
     perform_attack()
-    #test()
+    # iteration = sum([perform_attack() for i in range(10)]) / 10
+    # print(iteration)

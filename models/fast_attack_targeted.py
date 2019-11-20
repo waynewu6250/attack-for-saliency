@@ -131,6 +131,7 @@ class TargetedAttack():
                 # save_image(img_as_var, 'untargeted_adv_img.jpg')
 
                 if confirmation_score.item() > 0.9:
+                    return i
                     break
 
         return 1

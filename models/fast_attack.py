@@ -75,7 +75,7 @@ class UntargetedAttack():
         img_original = Variable(self.img).to(self.device)
         img_as_var = Variable(self.img).to(self.device)
 
-        for i in range(10):
+        for i in range(100):
 
             print("\n======== Iteration {} ========".format(i))
             print('Original image was classified as: ', self.true_label_var.item())
@@ -128,6 +128,7 @@ class UntargetedAttack():
                 # save_image(img_as_var, 'untargeted_adv_img.jpg')
 
                 if confirmation_score.item() > 0.9:
+                    return i
                     break
 
         return 1
