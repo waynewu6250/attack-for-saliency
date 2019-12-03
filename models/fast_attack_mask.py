@@ -119,7 +119,7 @@ class MaskTargetedAttack():
             mask[0][i][xv, yv] = 1
         return mask
     
-    def run_iterations(self, netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask_in, unet=False):
+    def run_iterations(self, netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask_in, mask_target=None, unet=False):
         
         im_original, im_noise, im_adv = None, None, None
 
@@ -142,6 +142,7 @@ class MaskTargetedAttack():
             if unet:
                 mask = self.mask_model(mask_in)
                 mask = F.interpolate(mask, size=[224, 224], mode="bilinear")
+                mask_loss = nn.MSELoss()
                 print(mask)
             else:
                 mask = mask_in
@@ -153,7 +154,7 @@ class MaskTargetedAttack():
 
             # Re pass the processes image into model
             output_reconstruct = self.model(img_with_noise)
-            pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var)
+            pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var) + 10*mask_loss(mask, mask_target)
             print("Later loss: ", pred_loss_reconstruct.item())
 
             pred_loss_reconstruct.backward(retain_graph=True)
@@ -239,14 +240,22 @@ class MaskTargetedAttack():
             im.save('mask_targeted_adv_img.jpg')
         
         elif opt.mode == "unet":
-            params = list(self.mask_model.parameters())+list(netg.parameters())
-            optimizer_g = Adam(params, opt.lr1, betas=(opt.beta1, 0.999))
+            dydx = self.get_smooth_mask(self.img)
+            mask = self.convert_gray(dydx)
+            mask[mask<=0.1]=0
+            from matplotlib import pylab as P
+            P.imsave("mask.jpg", mask, cmap=P.cm.gray, vmin=0, vmax=1)
+            
+            mask_target = t.Tensor(mask).to(self.device)
+
+            #params = list(self.mask_model.parameters())+list(netg.parameters())
+            optimizer_g = Adam(self.mask_model.parameters(), opt.lr1, betas=(opt.beta1, 0.999))
 
             # Create noise
             adv_noise.copy_(t.randn(1, opt.inf, 1, 1))
             mask_in = F.interpolate(img_original, size=[572, 572], mode="bilinear")
             
-            stop_index, confirmation_score, im_original, im_noise, im_adv = self.run_iterations(netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask_in, unet=True)
+            stop_index, confirmation_score, im_original, im_noise, im_adv = self.run_iterations(netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask_in, mask_target, unet=True)
 
             im = Image.fromarray(im_original)
             im.save('mask_targeted_original.jpg')
