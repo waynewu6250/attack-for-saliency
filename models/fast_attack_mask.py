@@ -167,7 +167,7 @@ class MaskTargetedAttack():
                     row_grad = t.mean(t.abs((img[:-1 , :] - img[1 :, :])).pow(tv_beta))
                     col_grad = t.mean(t.abs((img[: , :-1] - img[: , 1 :])).pow(tv_beta))
                     return row_grad + col_grad
-                pred_loss_reconstruct = confirmation_score + 0.01*t.mean(t.abs(1-mask)) + 0.2*tv_norm(mask, 3) + 0.1*mask_loss(mask, mask_target)
+                pred_loss_reconstruct = confirmation_score + 0.01*t.mean(t.abs(1-mask)) + 0.2*tv_norm(mask, 3)
             else:
                 pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var)
             print("Later loss: ", pred_loss_reconstruct.item())
