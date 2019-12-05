@@ -140,13 +140,17 @@ class MaskTargetedAttack():
             fake_img = netg(adv_noise)
             
             if unet:
-                mask = self.mask_model(mask_in)
-                mask = F.interpolate(mask, size=[224, 224], mode="bilinear")
+                # mask = self.mask_model(mask_in)
+                # mask = F.interpolate(mask, size=[224, 224], mode="bilinear")
                 mask_loss = nn.MSELoss()
-                print(mask)
+                
+                upsample = t.nn.UpsamplingBilinear2d(size=(224, 224)).cuda()
+                upsampled_mask = upsample(mask_in)
+                mask = upsampled_mask.expand(1, 3, upsampled_mask.size(2), upsampled_mask.size(3)).to(self.device)
+
             else:
                 mask = mask_in
-            
+            print(mask)
             #adv_noise = self.alpha * t.sign(img.grad.data)
             img_with_noise = img_as_var + self.alpha*fake_img*mask
             #img_reconstruct = self.recreate_image(img_with_noise)
@@ -154,17 +158,24 @@ class MaskTargetedAttack():
 
             # Re pass the processes image into model
             output_reconstruct = self.model(img_with_noise)
-            pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var) + 10*mask_loss(mask, mask_target)
+            prediction = t.max(output_reconstruct,1)[1].item()
+            confirmation_score = F.softmax(output_reconstruct[0], dim=0)[prediction]
+
+            if unet:
+                def tv_norm(input, tv_beta):
+                    img = input[0, 0, :]
+                    row_grad = t.mean(t.abs((img[:-1 , :] - img[1 :, :])).pow(tv_beta))
+                    col_grad = t.mean(t.abs((img[: , :-1] - img[: , 1 :])).pow(tv_beta))
+                    return row_grad + col_grad
+                pred_loss_reconstruct = confirmation_score + 0.01*t.mean(t.abs(1-mask)) + 0.2*tv_norm(mask, 3) + 0.1*mask_loss(mask, mask_target)
+            else:
+                pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var)
             print("Later loss: ", pred_loss_reconstruct.item())
 
             pred_loss_reconstruct.backward(retain_graph=True)
             optimizer_g.step()
 
-            prediction = t.max(output_reconstruct,1)[1].item()
-            confirmation_score = F.softmax(output_reconstruct[0], dim=0)[prediction]
-            
-
-            if prediction == self.target_label:
+            if prediction != self.true_label:
                 print('\nAttack Success!!')
                 print('Original image was predicted as: ', prediction_true)
                 print('With adversarial noise converted to: ', prediction)
@@ -174,8 +185,22 @@ class MaskTargetedAttack():
                 im_noise = self.recreate_image(self.alpha*fake_img*mask, noise=True)
                 im_adv = self.recreate_image(img_with_noise)
 
-                if confirmation_score.item() > 0.9:
+                if confirmation_score.item() < 0.6:
                     break
+
+            # if prediction == self.target_label:
+            #     print('\nAttack Success!!')
+            #     print('Original image was predicted as: ', prediction_true)
+            #     print('With adversarial noise converted to: ', prediction)
+            #     print('The confident score by probability is: ', confirmation_score.item())
+
+            #     im_original = self.recreate_image(img_original)
+            #     im_noise = self.recreate_image(self.alpha*fake_img*mask, noise=True)
+            #     im_adv = self.recreate_image(img_with_noise)
+
+            #     if confirmation_score.item() > 0.9:
+            #         break
+        
         return i, confirmation_score, im_original, im_noise, im_adv
 
 
@@ -247,13 +272,17 @@ class MaskTargetedAttack():
             P.imsave("mask.jpg", mask, cmap=P.cm.gray, vmin=0, vmax=1)
             
             mask_target = t.Tensor(mask).to(self.device)
-
+            # upsample = t.nn.UpsamplingBilinear2d(size=(572, 572)).cuda()
+            # mask_in = upsample(img_original)
             #params = list(self.mask_model.parameters())+list(netg.parameters())
-            optimizer_g = Adam(self.mask_model.parameters(), opt.lr1, betas=(opt.beta1, 0.999))
+            #optimizer_g = Adam(self.mask_model.parameters(), 0.01, betas=(opt.beta1, 0.999), weight_decay=2)
 
             # Create noise
             adv_noise.copy_(t.randn(1, opt.inf, 1, 1))
-            mask_in = F.interpolate(img_original, size=[572, 572], mode="bilinear")
+            mask_in = Variable(t.ones(1,1,28,28), requires_grad=True)
+            optimizer_g = Adam([mask_in], 0.01, betas=(opt.beta1, 0.999))
+
+
             
             stop_index, confirmation_score, im_original, im_noise, im_adv = self.run_iterations(netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask_in, mask_target, unet=True)
 
