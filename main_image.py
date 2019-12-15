@@ -42,7 +42,7 @@ def test(i):
             tv.transforms.Normalize([0.485, 0.456, 0.406],
                                     [0.229, 0.224, 0.225])
         ])
-    img = Image.open('imagenet/elephants.jpg').convert('RGB')
+    img = Image.open('imagenet/lady.jpg').convert('RGB')
     img = transform(img)
 
     #Model
@@ -133,7 +133,7 @@ def perform_attack(**kwargs):
     print(idx2label[101])
 
     # Select attack model
-    path = 'imagenet/elephants.jpg'
+    path = 'imagenet/lady.jpg'
     if opt.attack_model == "untargeted-attack":
         attackmodel = UntargetedAttack(model, opt.alpha, path, y, device)
     elif opt.attack_model == "targeted-attack":

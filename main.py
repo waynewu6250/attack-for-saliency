@@ -222,7 +222,7 @@ def perform_attack(**kwargs):
     id2label = {v:k for k, v in label2id.items()}
 
     labels = [labels[img] for img in imgs]
-    index = np.random.randint(0,len(imgs), 1)[0] #3510
+    index = 3510 #np.random.randint(0,len(imgs), 1)[0] #3510
     
 
     #Model

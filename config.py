@@ -22,7 +22,7 @@ class Config:
     lr = 1e-4
 
     # For attack model
-    alpha = 0.05
+    alpha = 0.002 # 0.05
     mode = "unet"
 
 opt = Config()

@@ -122,13 +122,15 @@ class MaskTargetedAttack():
     def run_iterations(self, netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask_in, mask_target=None, unet=False):
         
         im_original, im_noise, im_adv = None, None, None
+        optimizer_q = Adam(netg.parameters())
 
-        for i in range(100):
+        for i in range(500):
     
             print("\n======== Iteration {} ========".format(i))
             print('Original image was classified as: ', self.true_label_var.item())
 
             optimizer_g.zero_grad()
+            optimizer_q.zero_grad()
 
             # First pass the original image into model
             output = self.model(img_original)
@@ -167,13 +169,14 @@ class MaskTargetedAttack():
                     row_grad = t.mean(t.abs((img[:-1 , :] - img[1 :, :])).pow(tv_beta))
                     col_grad = t.mean(t.abs((img[: , :-1] - img[: , 1 :])).pow(tv_beta))
                     return row_grad + col_grad
-                pred_loss_reconstruct = confirmation_score + 0.01*t.mean(t.abs(1-mask)) + 0.2*tv_norm(mask, 3)
+                pred_loss_reconstruct = confirmation_score + 0.1*t.mean(t.abs(1-mask)) + 0.2*tv_norm(mask, 3) + 0.1*mask_loss(mask, mask_target)
             else:
                 pred_loss_reconstruct = criterion(output_reconstruct, self.target_label_var)
             print("Later loss: ", pred_loss_reconstruct.item())
 
             pred_loss_reconstruct.backward(retain_graph=True)
             optimizer_g.step()
+            optimizer_q.step()
 
             if prediction != self.true_label:
                 print('\nAttack Success!!')
@@ -182,10 +185,10 @@ class MaskTargetedAttack():
                 print('The confident score by probability is: ', confirmation_score.item())
 
                 im_original = self.recreate_image(img_original)
-                im_noise = self.recreate_image(self.alpha*fake_img*mask, noise=True)
+                im_noise = self.recreate_image(fake_img*mask, noise=True)
                 im_adv = self.recreate_image(img_with_noise)
 
-                if confirmation_score.item() < 0.6:
+                if pred_loss_reconstruct.item() < 0.5:
                     break
 
             # if prediction == self.target_label:
@@ -252,7 +255,11 @@ class MaskTargetedAttack():
             from matplotlib import pylab as P
             P.imsave("mask.jpg", mask, cmap=P.cm.gray, vmin=0, vmax=1)
             
+            #mask = np.random.permutation(mask)
+            #mask = np.random.permutation(mask.T)
             mask = t.Tensor(mask).to(self.device)
+            
+            #mask = mask.permute(1,0)
             
             stop_index, confirmation_score, im_original, im_noise, im_adv = self.run_iterations(netg, adv_noise, optimizer_g, criterion, img_original, img_as_var, mask)
             
