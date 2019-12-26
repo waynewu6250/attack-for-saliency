@@ -99,8 +99,8 @@ def train(**kwargs):
 
 def test(i):
 
-    # for k, v in kwargs.items():
-    #     setattr(opt, k, v)
+    for k, v in kwargs.items():
+        setattr(opt, k, v)
 
     device = t.device('cuda') if t.cuda.is_available() else t.device('cpu')
 
@@ -256,11 +256,11 @@ def perform_attack(**kwargs):
             
 
 if __name__ == "__main__":
-    # import fire
-    # fire.Fire()
+    import fire
+    fire.Fire()
 
     # for i in range(3):
     #     test(i)
-    perform_attack()
+    # perform_attack()
     # iteration = sum([perform_attack() for i in range(10)]) / 10
     # print(iteration)
