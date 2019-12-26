@@ -21,6 +21,6 @@ We use two datasets for attack purpose: one is ImageNet and the other is from [D
 
 ## Results
 
-<img src="https://github.com/waynewu6250/attack-for-saliency/blob/master/imagenet.pdf">
+<img src="https://github.com/waynewu6250/attack-for-saliency/blob/master/imagenet.jpg">
 
 
