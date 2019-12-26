@@ -20,6 +20,7 @@ We use two datasets for attack purpose: one is ImageNet and the other is from [D
    For this mode, you should further specify the   `opt.mode` to be `partial`, `random`, `unet`
 
 ## Results
+Four modes for saliency attack:
 
 <img src="https://github.com/waynewu6250/attack-for-saliency/blob/master/imagenet.jpg">
 
